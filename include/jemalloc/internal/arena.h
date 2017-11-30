@@ -1450,7 +1450,10 @@ arena_dalloc(tsdn_t *tsdn, void *ptr, tcache_t *tcache, bool slow_path)
 #if defined(__ANDROID__)
 		/* Verify the ptr has been allocated. */
 		if (unlikely((mapbits & CHUNK_MAP_ALLOCATED) == 0)) {
-		    __libc_fatal("Invalid address %p passed to free: value not allocated", ptr);
+		    __libc_format_log(ANDROID_LOG_ERROR, "libc",
+		        "*** Invalid address %p passed to free: value not allocated", ptr);
+		    return;
+		    //__libc_fatal("Invalid address %p passed to free: value not allocated", ptr);
 		}
 #endif
 		if (likely((mapbits & CHUNK_MAP_LARGE) == 0)) {

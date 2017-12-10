@@ -1433,6 +1433,9 @@ arena_dalloc(tsdn_t *tsdn, void *ptr, tcache_t *tcache, bool slow_path)
 	arena_chunk_t *chunk;
 	size_t pageind, mapbits;
 
+	static int invalidAddressCnt = 0;
+	static void *lastInvalidAddress = 0;
+
 	assert(!tsdn_null(tsdn) || tcache == NULL);
 	assert(ptr != NULL);
 
@@ -1450,10 +1453,19 @@ arena_dalloc(tsdn_t *tsdn, void *ptr, tcache_t *tcache, bool slow_path)
 #if defined(__ANDROID__)
 		/* Verify the ptr has been allocated. */
 		if (unlikely((mapbits & CHUNK_MAP_ALLOCATED) == 0)) {
-		    __libc_format_log(ANDROID_LOG_ERROR, "libc",
-		        "*** Invalid address %p passed to free: value not allocated", ptr);
-		    return;
-		    //async_safe_fatal("Invalid address %p passed to free: value not allocated", ptr);
+			if (invalidAddressCnt == 0 || (lastInvalidAddress != ptr)) {
+				lastInvalidAddress = ptr;
+				invalidAddressCnt = 1;
+			} else {
+				invalidAddressCnt++;
+			}
+			if (invalidAddressCnt == 1 || (invalidAddressCnt % 100 == 0)) {
+				async_safe_format_log(ANDROID_LOG_ERROR, "libc",
+					"*** Invalid address %p passed to free: value not allocated, %d. time(s)",
+					ptr, invalidAddressCnt);
+			}
+			return;
+			//async_safe_fatal("Invalid address %p passed to free: value not allocated", ptr);
 		}
 #endif
 		if (likely((mapbits & CHUNK_MAP_LARGE) == 0)) {
